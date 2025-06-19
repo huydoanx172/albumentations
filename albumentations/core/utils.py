@@ -15,6 +15,7 @@ from numbers import Real
 from typing import TYPE_CHECKING, Any, Literal, cast, overload
 
 import numpy as np
+import torch
 
 from albumentations.core.label_manager import LabelManager
 
@@ -41,15 +42,11 @@ def get_image_shape(img: np.ndarray | torch.Tensor) -> tuple[int, int]:
         RuntimeError: If the image type is not supported.
 
     """
+    # Optimized for common case (np.ndarray first based on profile)
     if isinstance(img, np.ndarray):
         return img.shape[:2]  # HWC format
-    try:
-        import torch
-
-        if torch.is_tensor(img):
-            return img.shape[-2:]  # CHW format
-    except ImportError:
-        pass
+    if isinstance(img, torch.Tensor):
+        return img.shape[-2:]  # CHW format
     raise RuntimeError(f"Unsupported image type: {type(img)}")
 
 
