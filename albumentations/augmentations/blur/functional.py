@@ -191,12 +191,19 @@ def zoom_blur(img: np.ndarray, zoom_factors: np.ndarray | Sequence[int]) -> np.n
 
 
 def _ensure_min_value(result: tuple[int, int], min_value: int, field_name: str | None) -> tuple[int, int]:
-    if result[0] < min_value or result[1] < min_value:
-        new_result = (max(min_value, result[0]), max(min_value, result[1]))
+    # Fast path: Most calls won't trigger this branch
+    x, y = result
+    if x < min_value or y < min_value:
+        xr = max(x, min_value)
+        yr = max(y, min_value)
+        new_result = (xr, yr)
+        # Build warning string in a single step
         warn(
-            f"{field_name}: Invalid kernel size range {result}. "
-            f"Values less than {min_value} are not allowed. "
-            f"Range automatically adjusted to {new_result}.",
+            (
+                f"{field_name}: Invalid kernel size range {result}. "
+                f"Values less than {min_value} are not allowed. "
+                f"Range automatically adjusted to {new_result}."
+            ),
             UserWarning,
             stacklevel=2,
         )
