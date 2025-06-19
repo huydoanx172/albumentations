@@ -1445,7 +1445,9 @@ def extend_value(value: tuple[float, ...] | float, num_channels: int) -> Sequenc
         Sequence[float]: The extended value.
 
     """
-    return [value] * num_channels if isinstance(value, float) else value
+    if type(value) is float:
+        return [value] * num_channels
+    return value
 
 
 def copy_make_border_with_value_extension(
