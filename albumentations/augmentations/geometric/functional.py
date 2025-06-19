@@ -1399,21 +1399,19 @@ def pad(
     """
     height, width = img.shape[:2]
 
-    if height < min_height:
-        h_pad_top = int((min_height - height) / 2.0)
-        h_pad_bottom = min_height - height - h_pad_top
-    else:
-        h_pad_top = 0
-        h_pad_bottom = 0
+    dh = min_height - height
+    dw = min_width - width
 
-    if width < min_width:
-        w_pad_left = int((min_width - width) / 2.0)
-        w_pad_right = min_width - width - w_pad_left
-    else:
-        w_pad_left = 0
-        w_pad_right = 0
+    # Fast return if no padding needed
+    if dh <= 0 and dw <= 0:
+        return img
 
-    img = pad_with_params(
+    h_pad_top = dh // 2 if dh > 0 else 0
+    h_pad_bottom = dh - h_pad_top if dh > 0 else 0
+    w_pad_left = dw // 2 if dw > 0 else 0
+    w_pad_right = dw - w_pad_left if dw > 0 else 0
+
+    out_img = pad_with_params(
         img,
         h_pad_top,
         h_pad_bottom,
@@ -1423,12 +1421,15 @@ def pad(
         value,
     )
 
-    if img.shape[:2] != (max(min_height, height), max(min_width, width)):
+    expected_shape = (
+        height + h_pad_top + h_pad_bottom,
+        width + w_pad_left + w_pad_right,
+    )
+    if out_img.shape[:2] != expected_shape:
         raise RuntimeError(
-            f"Invalid result shape. Got: {img.shape[:2]}. Expected: {(max(min_height, height), max(min_width, width))}",
+            f"Invalid result shape. Got: {out_img.shape[:2]}. Expected: {expected_shape}",
         )
-
-    return img
+    return out_img
 
 
 def extend_value(value: tuple[float, ...] | float, num_channels: int) -> Sequence[float]:
@@ -1524,6 +1525,10 @@ def pad_with_params(
         np.ndarray: Padded image.
 
     """
+    # Optimization: if no padding requested, just return original image.
+    if h_pad_top == 0 and h_pad_bottom == 0 and w_pad_left == 0 and w_pad_right == 0:
+        return img
+
     pad_fn = maybe_process_in_chunks(
         copy_make_border_with_value_extension,
         top=h_pad_top,
