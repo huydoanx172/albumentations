@@ -114,10 +114,12 @@ def format_args(args_dict: dict[str, Any]) -> str:
         str: Formatted string of arguments in the form "key1='value1', key2=value2".
 
     """
-    formatted_args = []
-    for k, v in args_dict.items():
-        v_formatted = f"'{v}'" if isinstance(v, str) else str(v)
-        formatted_args.append(f"{k}={v_formatted}")
+    # Move lookups to local to speed up
+    _isinstance = isinstance
+    _str = str
+    items = args_dict.items()
+    # Use list comprehensions for faster execution
+    formatted_args = [f"{k}='{v}'" if _isinstance(v, str) else f"{k}={_str(v)}" for k, v in items]
     return ", ".join(formatted_args)
 
 
