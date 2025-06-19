@@ -276,31 +276,21 @@ def create_motion_kernel(
     dx = np.cos(angle_rad)
     dy = np.sin(angle_rad)
 
-    # Create line points with direction bias
     line_length = kernel_size // 2
 
-    # Apply direction bias to control the distribution of blur
+    # Apply direction bias
     if direction < 0:
-        # Backward bias: interpolate between symmetric and backward-only
-        # direction = -1: only backward, direction = 0: symmetric
         bias_factor = abs(direction)
-        t_start = float(-line_length)
-        t_end = line_length * (1 - bias_factor)
+        t_start, t_end = float(-line_length), line_length * (1 - bias_factor)
     elif direction > 0:
-        # Forward bias: interpolate between symmetric and forward-only
-        # direction = 1: only forward, direction = 0: symmetric
         bias_factor = direction
-        t_start = -line_length * (1 - bias_factor)
-        t_end = float(line_length)
+        t_start, t_end = -line_length * (1 - bias_factor), float(line_length)
     else:
-        # Symmetric case (direction = 0)
-        t_start = float(-line_length)
-        t_end = float(line_length)
+        t_start, t_end = float(-line_length), float(line_length)
 
     # Generate points along the biased line
     t = np.linspace(t_start, t_end, kernel_size)
 
-    # Generate line coordinates
     x = center + dx * t
     y = center + dy * t
 
@@ -312,16 +302,18 @@ def create_motion_kernel(
         y += shift_y
 
     # Round coordinates and clip to kernel bounds
-    x = np.clip(np.round(x), 0, kernel_size - 1).astype(int)
-    y = np.clip(np.round(y), 0, kernel_size - 1).astype(int)
+    x = np.clip(np.round(x), 0, kernel_size - 1).astype(np.intp)
+    y = np.clip(np.round(y), 0, kernel_size - 1).astype(np.intp)
 
-    # Keep only unique points to avoid multiple assignments
-    points = np.unique(np.column_stack([y, x]), axis=0)
-    kernel[points[:, 0], points[:, 1]] = 1
+    # Fast unique selection using boolean mask
+    # Avoid np.unique/np.column_stack overhead
+    marker = np.zeros((kernel_size, kernel_size), dtype=bool)
+    marker[y, x] = True
+    kernel[marker] = 1.0
 
     # Ensure at least one point is set
-    if not kernel.any():
-        kernel[center, center] = 1
+    if not marker.any():
+        kernel[center, center] = 1.0
 
     return kernel
 
