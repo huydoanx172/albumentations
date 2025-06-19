@@ -15,6 +15,7 @@ from numbers import Real
 from typing import TYPE_CHECKING, Any, Literal, cast, overload
 
 import numpy as np
+import torch
 
 from albumentations.core.label_manager import LabelManager
 
@@ -69,13 +70,8 @@ def get_volume_shape(vol: np.ndarray | torch.Tensor) -> tuple[int, int, int]:
     """
     if isinstance(vol, np.ndarray):
         return vol.shape[:3]  # DHWC format
-    try:
-        import torch
-
-        if torch.is_tensor(vol):
-            return vol.shape[-3:]  # CDHW format
-    except ImportError:
-        pass
+    if isinstance(vol, torch.Tensor):
+        return vol.shape[-3:]  # CDHW format
     raise RuntimeError(f"Unsupported volume type: {type(vol)}")
 
 
