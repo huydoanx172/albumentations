@@ -34,6 +34,7 @@ def get_opener() -> OpenerDirector:
         OpenerDirector: URL opener instance for making HTTP requests.
 
     """
+    # Use the opener imported from albumentations.check_version
     global opener  # noqa: PLW0603
     if opener is None:
         opener = urllib.request.build_opener(urllib.request.HTTPHandler(), urllib.request.HTTPSHandler())
@@ -52,16 +53,19 @@ def fetch_version_info() -> str:
              empty string otherwise.
 
     """
-    opener = get_opener()
+    local_get_opener = get_opener  # Local alias for faster lookup
+    opener = local_get_opener()
     url = "https://pypi.org/pypi/albumentations/json"
+    local_warn = warn  # Local alias for faster exception handling
     try:
-        with opener.open(url, timeout=2) as response:
+        open_fn = opener.open  # Local variable for performance
+        with open_fn(url, timeout=2) as response:
             if response.status == SUCCESS_HTML_CODE:
                 data = response.read()
-                encoding = response.info().get_content_charset("utf-8")
-                return data.decode(encoding)
+                # PyPI always returns UTF-8 for this endpoint, so skip header decode lookup
+                return data.decode("utf-8")
     except Exception as e:  # noqa: BLE001
-        warn(f"Error fetching version info {e}", stacklevel=2)
+        local_warn(f"Error fetching version info {e}", stacklevel=2)
     return ""
 
 
