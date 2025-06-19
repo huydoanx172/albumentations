@@ -468,7 +468,8 @@ def process_scalar(param: Number, low: Number | None) -> tuple[Number, Number]:
             - If low is None: (-param, param) creating a symmetric range around zero
 
     """
-    if isinstance(low, Real):
+    if low is not None and isinstance(low, (int, float, complex)):
+        # most common case: int or float (complex is a fallback due to original typedef)
         return (low, param) if low < param else (param, low)
     return -param, param
 
