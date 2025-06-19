@@ -224,23 +224,24 @@ def process_blur_limit(value: int | tuple[int, int], info: ValidationInfo, min_v
     if isinstance(value, Sequence):
         if len(value) != 2:
             raise ValueError("Sequence must contain exactly 2 elements")
-        result = (int(value[0]), int(value[1]))
+        x0, x1 = int(value[0]), int(value[1])
     else:
-        result = (min_value, int(value))
+        x0, x1 = min_value, int(value)
 
-    result = _ensure_min_value(result, min_value, info.field_name)
-    result = _ensure_odd_values(result, info.field_name)
+    # Single function to reduce overhead
+    res = _ensure_min_and_odd_values((x0, x1), min_value, info.field_name)
 
-    if result[0] > result[1]:
-        final_result = (result[1], result[1])
+    # If min > max, auto adjust (done at the end for minimal branching)
+    if res[0] > res[1]:
+        final_result = (res[1], res[1])
         warn(
-            f"{info.field_name}: Invalid range {result} (min > max). Range automatically adjusted to {final_result}.",
+            f"{info.field_name}: Invalid range {res} (min > max). Range automatically adjusted to {final_result}.",
             UserWarning,
             stacklevel=2,
         )
         return final_result
 
-    return result
+    return res
 
 
 def create_motion_kernel(
@@ -436,3 +437,46 @@ def create_gaussian_kernel_input_array(size: int) -> np.ndarray:
         return np.array(list(range(-(size // 2), (size // 2) + 1, 1)))
 
     return np.linspace(-(size // 2), size // 2, size)
+
+
+def _ensure_min_and_odd_values(
+    result: tuple[int, int],
+    min_value: int,
+    field_name: str | None,
+) -> tuple[int, int]:
+    # Inline both min check and odd enforcement to minimize function call and tuple overhead
+    x0, x1 = result
+
+    changed = False
+
+    # Ensure minimum
+    if x0 < min_value:
+        x0 = min_value
+        changed = True
+    if x1 < min_value:
+        x1 = min_value
+        changed = True
+    if changed:
+        warn(
+            f"{field_name}: Invalid kernel size range {result}. "
+            f"Values less than {min_value} are not allowed. "
+            f"Range automatically adjusted to ({x0}, {x1}).",
+            UserWarning,
+            stacklevel=3,
+        )
+
+    # Ensure odd kernel sizes if not zero
+    odd_changed = False
+    if x0 != 0 and x0 % 2 == 0:
+        x0 += 1
+        odd_changed = True
+    if x1 != 0 and x1 % 2 == 0:
+        x1 += 1
+        odd_changed = True
+    if odd_changed:
+        warn(
+            f"{field_name}: Non-zero kernel sizes must be odd. Range {result if not changed else (result[0], result[1])} automatically adjusted to ({x0}, {x1}).",
+            UserWarning,
+            stacklevel=2,
+        )
+    return (x0, x1)
