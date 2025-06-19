@@ -1042,16 +1042,15 @@ def validate_if_not_found_coords(
     """Validate and process `if_not_found_coords` parameter."""
     if if_not_found_coords is None:
         return True, -1, -1
-    if isinstance(if_not_found_coords, (tuple, list)):
-        if len(if_not_found_coords) != PAIR:
-            msg = "Expected tuple/list 'if_not_found_coords' to contain exactly two entries."
-            raise ValueError(msg)
-        return False, if_not_found_coords[0], if_not_found_coords[1]
-    if isinstance(if_not_found_coords, dict):
+    t = type(if_not_found_coords)
+    if t is tuple or t is list:
+        if len(if_not_found_coords) != 2:
+            raise ValueError("Expected tuple/list 'if_not_found_coords' to contain exactly two entries.")
+        x, y = if_not_found_coords
+        return False, x, y
+    if t is dict:
         return False, if_not_found_coords["x"], if_not_found_coords["y"]
-
-    msg = "Expected if_not_found_coords to be None, tuple, list, or dict."
-    raise ValueError(msg)
+    raise ValueError("Expected if_not_found_coords to be None, tuple, list, or dict.")
 
 
 def find_keypoint(
