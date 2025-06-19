@@ -26,7 +26,6 @@ from albumentations.core.type_definitions import EIGHT
 __all__ = ["box_blur", "central_zoom", "defocus", "glass_blur", "median_blur", "zoom_blur"]
 
 
-@preserve_channel_dim
 def box_blur(img: np.ndarray, ksize: int) -> np.ndarray:
     """Blur an image.
 
@@ -40,8 +39,15 @@ def box_blur(img: np.ndarray, ksize: int) -> np.ndarray:
         np.ndarray: Blurred image.
 
     """
-    blur_fn = maybe_process_in_chunks(cv2.blur, ksize=(ksize, ksize))
-    return blur_fn(img)
+    # Fast-path: If channel dim is present (common case), cv2.blur preserves dims.
+    # Only handle special case if shape[-1] == 1 with mono-channel result.
+    shape = img.shape
+    result = cv2.blur(img, (ksize, ksize))
+    # Avoid unnecessary dim expansion in common 3D case
+    if len(shape) == 3 and shape[-1] == 1 and result.ndim == 2:
+        # Only expand dims for (H, W, 1) input that returns (H, W)
+        return np.expand_dims(result, axis=-1)
+    return result
 
 
 @preserve_channel_dim
