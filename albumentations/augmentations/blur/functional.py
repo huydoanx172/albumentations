@@ -403,18 +403,18 @@ def create_gaussian_kernel_1d(sigma: float, ksize: int = 0) -> np.ndarray:
         np.ndarray: 1D normalized Gaussian kernel.
 
     """
-    # PIL's kernel creation approach
     size = int(sigma * 3.5) * 2 + 1 if ksize == 0 else ksize
+    size |= 1  # Ensure size is odd
 
-    # Ensure odd size
-    size = size + 1 if size % 2 == 0 else size
-
-    # Create x coordinates
     x = create_gaussian_kernel_input_array(size=size)
 
-    # Compute 1D kernel using vectorized operations
-    kernel_1d = np.exp(-0.5 * (x / sigma) ** 2)
-    return kernel_1d / kernel_1d.sum()
+    # Compute kernel with fewer temporaries by using out arg and inplace division
+    x = x / sigma
+    np.square(x, out=x)
+    x *= -0.5
+    np.exp(x, out=x)
+    x /= x.sum()
+    return x
 
 
 def create_gaussian_kernel_input_array(size: int) -> np.ndarray:
@@ -432,7 +432,8 @@ def create_gaussian_kernel_input_array(size: int) -> np.ndarray:
         separable gaussian blur
 
     """
+    half = size // 2
     if size < 100:
-        return np.array(list(range(-(size // 2), (size // 2) + 1, 1)))
-
-    return np.linspace(-(size // 2), size // 2, size)
+        # much faster than list(range(...))
+        return np.arange(-half, half + 1, dtype=np.float64)
+    return np.linspace(-half, half, size, dtype=np.float64)
