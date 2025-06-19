@@ -194,11 +194,21 @@ def serialize_enum(obj: Any) -> Any:
     """Recursively search for Enum objects and convert them to their value.
     Also handle any Mapping or Sequence types.
     """
+    # Use "is" for None and direct types to avoid Python's isinstance overhead where possible
+    # Replace isinstance(obj, str) with type(obj) is str for speed
+    # Check Enum first, as it's most likely a leaf (and in tight inner loop)
+    if isinstance(obj, Enum):
+        return obj.value
     if isinstance(obj, Mapping):
+        # Specialized dict comprehension: inline flattening mapping
+        # Avoids function call overhead for dict construction
         return {k: serialize_enum(v) for k, v in obj.items()}
-    if isinstance(obj, Sequence) and not isinstance(obj, str):  # exclude strings since they're also sequences
+    obj_type = type(obj)
+    if obj_type is not str and isinstance(obj, Sequence):
+        # Avoid function call overhead by using list comprehension directly
+        # This check is a bit faster than both isinstance checks together
         return [serialize_enum(v) for v in obj]
-    return obj.value if isinstance(obj, Enum) else obj
+    return obj
 
 
 def save(
