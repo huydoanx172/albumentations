@@ -241,6 +241,13 @@ def resize(
     if target_shape == img.shape[:2]:
         return img
 
+    # Optimized fast-path for regular images (2D, 3D with <=4 channels).
+    img_shape = img.shape
+    if img.ndim == 2 or (img.ndim == 3 and img.shape[2] <= 4):
+        height, width = target_shape[:2]
+        return cv2.resize(img, (width, height), interpolation=interpolation)
+
+    # Fallback to original chunked approach for odd/unusual shapes
     height, width = target_shape[:2]
     resize_fn = maybe_process_in_chunks(
         cv2.resize,
