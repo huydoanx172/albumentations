@@ -12,7 +12,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from collections.abc import Sequence
 from numbers import Real
-from typing import TYPE_CHECKING, Any, Literal, cast, overload
+from typing import TYPE_CHECKING, Any, Literal
 
 import numpy as np
 
@@ -433,6 +433,7 @@ def validate_args(
         ValueError: If both 'low' and 'bias' are provided.
 
     """
+    # As before.
     if low is not None and bias is not None:
         raise ValueError("Arguments 'low' and 'bias' cannot be used together.")
 
@@ -525,20 +526,170 @@ def ensure_contiguous_output(arg: np.ndarray | Sequence[np.ndarray]) -> np.ndarr
     return arg
 
 
-@overload
 def to_tuple(
     param: int | tuple[int, int],
     low: int | tuple[int, int] | None = None,
     bias: float | None = None,
-) -> tuple[int, int]: ...
+) -> tuple[int, int]:
+    """Convert input argument to a min-max tuple.
+
+    This function processes various input types and returns a tuple representing a range.
+    It handles single values, sequences, and can apply optional low bounds or biases.
+
+    Args:
+        param (tuple[float, float] | float | tuple[int, int] | int): The primary input value. Can be:
+            - A single int or float: Converted to a symmetric range around zero.
+            - A tuple of two ints or two floats: Used directly as min and max values.
+
+        low (tuple[float, float] | float | None, optional): A lower bound value. Used when param is a single value.
+            If provided, the result will be (low, param) or (param, low), depending on which is smaller.
+            Cannot be used together with 'bias'. Defaults to None.
+
+        bias (float | int | None, optional): A value to be added to both elements of the resulting tuple.
+            Cannot be used together with 'low'. Defaults to None.
+
+    Returns:
+        tuple[int, int] | tuple[float, float]: A tuple representing the processed range.
+            - If input is int-based, returns tuple[int, int]
+            - If input is float-based, returns tuple[float, float]
+
+    Raises:
+        ValueError: If both 'low' and 'bias' are provided.
+        TypeError: If 'param' is neither a scalar nor a sequence of 2 elements.
+
+    Examples:
+        >>> to_tuple(5)
+        (-5, 5)
+        >>> to_tuple(5.0)
+        (-5.0, 5.0)
+        >>> to_tuple((1, 10))
+        (1, 10)
+        >>> to_tuple(5, low=3)
+        (3, 5)
+        >>> to_tuple(5, bias=1)
+        (-4, 6)
+
+    Notes:
+        - When 'param' is a single value and 'low' is not provided, the function creates a symmetric range around zero.
+        - The function preserves the type (int or float) of the input in the output.
+        - If a sequence is provided, it must contain exactly 2 elements.
+
+    """
+    validate_args(low, bias)
+
+    # Inline "process_sequence"
+    if isinstance(param, Sequence):
+        if len(param) != PAIR:
+            raise ValueError("Sequence must contain exactly 2 elements.")
+        a, b = param[0], param[1]
+        min_val, max_val = (a, b) if a < b else (b, a)
+    # Inline "process_scalar"
+    elif isinstance(param, Real):
+        if isinstance(low, Real):
+            min_val, max_val = (low, param) if low < param else (param, low)
+        else:
+            min_val, max_val = -param, param
+    else:
+        raise TypeError("Argument 'param' must be either a scalar or a sequence of 2 elements.")
+
+    # Inline "apply_bias"
+    if bias is not None:
+        min_val += bias
+        max_val += bias
+
+    # Inline "ensure_int_output"
+    # Use param type if scalar, else use the type of min_val (from sequence)
+    if isinstance(param, int):
+        return (int(min_val), int(max_val))
+    if isinstance(param, float):
+        return (float(min_val), float(max_val))
+    # If param is a sequence, use its element's type
+    if isinstance(min_val, int) and isinstance(max_val, int):
+        return (int(min_val), int(max_val))
+    return (float(min_val), float(max_val))
 
 
-@overload
 def to_tuple(
     param: float | tuple[float, float],
     low: float | tuple[float, float] | None = None,
     bias: float | None = None,
-) -> tuple[float, float]: ...
+) -> tuple[float, float]:
+    """Convert input argument to a min-max tuple.
+
+    This function processes various input types and returns a tuple representing a range.
+    It handles single values, sequences, and can apply optional low bounds or biases.
+
+    Args:
+        param (tuple[float, float] | float | tuple[int, int] | int): The primary input value. Can be:
+            - A single int or float: Converted to a symmetric range around zero.
+            - A tuple of two ints or two floats: Used directly as min and max values.
+
+        low (tuple[float, float] | float | None, optional): A lower bound value. Used when param is a single value.
+            If provided, the result will be (low, param) or (param, low), depending on which is smaller.
+            Cannot be used together with 'bias'. Defaults to None.
+
+        bias (float | int | None, optional): A value to be added to both elements of the resulting tuple.
+            Cannot be used together with 'low'. Defaults to None.
+
+    Returns:
+        tuple[int, int] | tuple[float, float]: A tuple representing the processed range.
+            - If input is int-based, returns tuple[int, int]
+            - If input is float-based, returns tuple[float, float]
+
+    Raises:
+        ValueError: If both 'low' and 'bias' are provided.
+        TypeError: If 'param' is neither a scalar nor a sequence of 2 elements.
+
+    Examples:
+        >>> to_tuple(5)
+        (-5, 5)
+        >>> to_tuple(5.0)
+        (-5.0, 5.0)
+        >>> to_tuple((1, 10))
+        (1, 10)
+        >>> to_tuple(5, low=3)
+        (3, 5)
+        >>> to_tuple(5, bias=1)
+        (-4, 6)
+
+    Notes:
+        - When 'param' is a single value and 'low' is not provided, the function creates a symmetric range around zero.
+        - The function preserves the type (int or float) of the input in the output.
+        - If a sequence is provided, it must contain exactly 2 elements.
+
+    """
+    validate_args(low, bias)
+
+    # Inline "process_sequence"
+    if isinstance(param, Sequence):
+        if len(param) != PAIR:
+            raise ValueError("Sequence must contain exactly 2 elements.")
+        a, b = param[0], param[1]
+        min_val, max_val = (a, b) if a < b else (b, a)
+    # Inline "process_scalar"
+    elif isinstance(param, Real):
+        if isinstance(low, Real):
+            min_val, max_val = (low, param) if low < param else (param, low)
+        else:
+            min_val, max_val = -param, param
+    else:
+        raise TypeError("Argument 'param' must be either a scalar or a sequence of 2 elements.")
+
+    # Inline "apply_bias"
+    if bias is not None:
+        min_val += bias
+        max_val += bias
+
+    # Inline "ensure_int_output"
+    # Use param type if scalar, else use the type of min_val (from sequence)
+    if isinstance(param, int):
+        return (int(min_val), int(max_val))
+    if isinstance(param, float):
+        return (float(min_val), float(max_val))
+    # If param is a sequence, use its element's type
+    if isinstance(min_val, int) and isinstance(max_val, int):
+        return (int(min_val), int(max_val))
+    return (float(min_val), float(max_val))
 
 
 def to_tuple(
@@ -592,14 +743,33 @@ def to_tuple(
     """
     validate_args(low, bias)
 
+    # Inline "process_sequence"
     if isinstance(param, Sequence):
-        min_val, max_val = process_sequence(param)
+        if len(param) != PAIR:
+            raise ValueError("Sequence must contain exactly 2 elements.")
+        a, b = param[0], param[1]
+        min_val, max_val = (a, b) if a < b else (b, a)
+    # Inline "process_scalar"
     elif isinstance(param, Real):
-        min_val, max_val = process_scalar(param, cast("Real", low))
+        if isinstance(low, Real):
+            min_val, max_val = (low, param) if low < param else (param, low)
+        else:
+            min_val, max_val = -param, param
     else:
         raise TypeError("Argument 'param' must be either a scalar or a sequence of 2 elements.")
 
+    # Inline "apply_bias"
     if bias is not None:
-        min_val, max_val = apply_bias(min_val, max_val, bias)
+        min_val += bias
+        max_val += bias
 
-    return ensure_int_output(min_val, max_val, param if isinstance(param, (int, float)) else min_val)
+    # Inline "ensure_int_output"
+    # Use param type if scalar, else use the type of min_val (from sequence)
+    if isinstance(param, int):
+        return (int(min_val), int(max_val))
+    if isinstance(param, float):
+        return (float(min_val), float(max_val))
+    # If param is a sequence, use its element's type
+    if isinstance(min_val, int) and isinstance(max_val, int):
+        return (int(min_val), int(max_val))
+    return (float(min_val), float(max_val))
