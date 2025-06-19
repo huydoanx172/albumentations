@@ -10,7 +10,6 @@ and simplify common operations across different augmentation transforms.
 from __future__ import annotations
 
 import functools
-from functools import wraps
 from typing import TYPE_CHECKING, Any, Callable, TypeVar, cast
 
 import cv2
@@ -102,12 +101,14 @@ def angle_2pi_range(
 
     """
 
-    @wraps(func)
     def wrapped_function(keypoints: np.ndarray, *args: P.args, **kwargs: P.kwargs) -> np.ndarray:
-        result = func(keypoints, *args, **kwargs)
-        if len(result) > 0 and result.shape[1] > 3:
-            result[:, 3] = angle_to_2pi_range(result[:, 3])
-        return result
+        arr = func(keypoints, *args, **kwargs)
+        # Fast shape check (avoids creating a view/slice when not needed)
+        shape = arr.shape
+        # Only normalize if we have at least one row and at least 4 columns
+        if shape[0] and shape[1] > 3:
+            arr[:, 3] = angle_to_2pi_range(arr[:, 3])
+        return arr
 
     return wrapped_function
 
