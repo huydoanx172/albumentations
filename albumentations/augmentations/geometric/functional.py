@@ -39,6 +39,13 @@ from albumentations.core.type_definitions import (
     REFLECT_BORDER_MODES,
 )
 
+"""Functional implementations of geometric image transformations.
+
+This module provides low-level functions for geometric operations such as rotation,
+resizing, flipping, perspective transforms, and affine transformations on images,
+bounding boxes and keypoints.
+"""
+
 PAIR = 2
 
 ROT90_180_FACTOR = 2
@@ -548,7 +555,33 @@ def is_identity_matrix(matrix: np.ndarray) -> bool:
         bool: True if the matrix is an identity matrix, False otherwise.
 
     """
-    return np.allclose(matrix, np.eye(3, dtype=matrix.dtype))
+    # Short-circuit for both 3x3 and 2x3 cases (avoid np.eye construction, allclose)
+    shape = matrix.shape
+    tol = 1e-8
+    if shape == (3, 3):
+        return (
+            abs(matrix[0, 0] - 1.0) <= tol
+            and abs(matrix[1, 1] - 1.0) <= tol
+            and abs(matrix[2, 2] - 1.0) <= tol
+            and abs(matrix[0, 1]) <= tol
+            and abs(matrix[0, 2]) <= tol
+            and abs(matrix[1, 0]) <= tol
+            and abs(matrix[1, 2]) <= tol
+            and abs(matrix[2, 0]) <= tol
+            and abs(matrix[2, 1]) <= tol
+        )
+    if shape == (2, 3):
+        # affine 2x3: [a, b, tx], [c, d, ty] :: should be [1, 0, 0], [0, 1, 0]
+        return (
+            abs(matrix[0, 0] - 1.0) <= tol
+            and abs(matrix[0, 1]) <= tol
+            and abs(matrix[0, 2]) <= tol
+            and abs(matrix[1, 0]) <= tol
+            and abs(matrix[1, 1] - 1.0) <= tol
+            and abs(matrix[1, 2]) <= tol
+        )
+    # fallback for odd shapes
+    return np.allclose(matrix, np.eye(matrix.shape[0], dtype=matrix.dtype))
 
 
 def warp_affine_with_value_extension(
@@ -615,13 +648,15 @@ def warp_affine(
         np.ndarray: Affine-transformed image with dimensions specified by output_shape.
 
     """
+    # Fast-trivial return for identity matrix
     if is_identity_matrix(matrix):
         return image
 
-    height = int(np.round(output_shape[0]))
-    width = int(np.round(output_shape[1]))
+    height = int(round(output_shape[0]))
+    width = int(round(output_shape[1]))
 
-    cv2_matrix = matrix[:2, :]
+    # Accept both 2x3 and 3x3, but OpenCV wants 2x3
+    cv2_matrix = matrix[:2, :] if matrix.shape[0] >= 2 else matrix
 
     warp_fn = maybe_process_in_chunks(
         warp_affine_with_value_extension,
@@ -3981,3 +4016,15 @@ def bboxes_morphology(
     masks = morphology(masks, kernel, operation)
     bboxes[:, :4] = bboxes_from_masks(masks)
     return bboxes
+
+
+def _extend_value(value: tuple[float, ...] | float, num_channels: int):
+    # Fast inlined version of extend_value without type indirection
+    if isinstance(value, float):
+        return [value] * num_channels
+    if isinstance(value, tuple) or isinstance(value, list):
+        if len(value) == num_channels:
+            return value
+        # Defensive fallback
+        return tuple(value) * (num_channels // len(value)) + tuple(value)[: (num_channels % len(value))]
+    return value
