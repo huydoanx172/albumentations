@@ -37,15 +37,15 @@ NON_SERIALIZABLE_REGISTRY: dict[str, SerializableMeta] = {}
 
 
 def shorten_class_name(class_fullname: str) -> str:
-    # Split the class_fullname once at the last '.' to separate the class name
-    split_index = class_fullname.rfind(".")
-
-    # If there's no '.' or the top module is not 'albumentations', return the full name
-    if split_index == -1 or not class_fullname.startswith("albumentations."):
+    # Fast path: check prefix directly
+    if not class_fullname.startswith("albumentations."):
         return class_fullname
 
-    # Extract the class name after the last '.'
-    return class_fullname[split_index + 1 :]
+    # Faster rpartition: avoids finding index and slicing repeatedly
+    head, sep, tail = class_fullname.rpartition(".")
+    if not sep:  # No dot found, should not happen since prefix check passed
+        return class_fullname
+    return tail
 
 
 class SerializableMeta(ABCMeta):
